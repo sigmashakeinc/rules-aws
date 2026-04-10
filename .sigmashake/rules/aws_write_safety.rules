@@ -1,0 +1,41 @@
+# aws_write_safety.rules
+# Technology: aws | Capability: write
+
+rule aws-s3-public-read {
+  enabled true
+  priority 95
+  severity error
+  DENY write
+  IF path GLOB "**/*.tf" AND content LINE_REGEX "acl\\s*=\\s*[\"']public-read[\"']"
+  OR path GLOB "**/*.yaml" AND content LINE_REGEX "acl\\s*:\\s*public-read"
+  MESSAGE "Setting S3 buckets to 'public-read' exposes data to the entire internet. Ensure this is explicitly intended (e.g. for a static website) or use 'private' and enable Block Public Access (BPA)."
+}
+
+rule aws-iam-star-action {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path GLOB "**/*.json" AND content LINE_REGEX "[\"']Action[\"']\\s*:\\s*[\"']\\*[\"']"
+  OR path GLOB "**/*.tf" AND content LINE_REGEX "actions\\s*=\\s*\\[\\s*[\"']\\*[\"']\\s*\\]"
+  MESSAGE "Using '*' for IAM actions grants administrative privileges. Follow the Principle of Least Privilege by explicitly defining necessary actions."
+}
+
+rule aws-sg-open-ssh-rdp {
+  enabled true
+  priority 95
+  severity error
+  DENY write
+  IF path GLOB "**/*.tf" AND content LINE_REGEX "from_port\\s*=\\s*(22|3389)" AND content LINE_REGEX "cidr_blocks\\s*=\\s*\\[\\s*[\"']0\\.0\\.0\\.0/0[\"']\\s*\\]"
+  MESSAGE "Opening SSH (22) or RDP (3389) to 0.0.0.0/0 exposes management ports to the public internet, a massive security risk. Restrict to specific IP ranges or use AWS Systems Manager Session Manager."
+}
+
+rule aws-imds-v1 {
+  enabled true
+  priority 85
+  severity warning
+  ASK write
+  IF path GLOB "**/*.tf" AND content LINE_REGEX "http_tokens\\s*=\\s*[\"']optional[\"']"
+  MESSAGE "Using IMDSv1 (http_tokens = optional) makes instances vulnerable to SSRF attacks which can leak IAM credentials. Require IMDSv2 by setting http_tokens = 'required'."
+  PROMPT "Are you sure you want to allow IMDSv1? Upgrading to IMDSv2 is strongly recommended."
+}

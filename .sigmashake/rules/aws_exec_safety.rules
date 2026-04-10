@@ -1,0 +1,60 @@
+# aws_exec_safety.rules — AWS CLI safety for AI agents.
+# Technology: aws | Capability: exec
+# Covers: public S3 buckets, IAM, resource deletion, region awareness.
+
+rule no-s3-public-acl {
+  enabled true
+  priority 95
+  severity error
+  DENY execution
+  IF command CONTAINS "s3api put-bucket-acl" AND command CONTAINS "public"
+  OR command CONTAINS "--acl public-read"
+  OR command CONTAINS "--acl public-read-write"
+  OR command CONTAINS "s3 website"
+  MESSAGE "Making an S3 bucket public exposes all objects to the internet. Use pre-signed URLs or CloudFront for controlled access instead."
+}
+
+rule no-iam-star-permissions {
+  enabled true
+  priority 90
+  severity error
+  DENY write
+  IF path GLOB "**/*.json" AND content LINE_REGEX "\"Action\":\\s*\"\\*\""
+  OR path GLOB "**/*.yaml" AND content LINE_REGEX "Action:\\s*\"\\*\""
+  OR path GLOB "**/*.yml" AND content LINE_REGEX "Action:\\s*\"\\*\""
+  MESSAGE "IAM wildcard Action '*' grants full access to all AWS services. Use least-privilege — specify only the exact actions needed."
+}
+
+rule no-resource-star-with-write {
+  enabled true
+  priority 85
+  severity warning
+  ASK write
+  IF path GLOB "**/*.json" AND content LINE_REGEX "\"Resource\":\\s*\"\\*\"" AND content CONTAINS "Action"
+  OR path GLOB "**/*.yaml" AND content LINE_REGEX "Resource:\\s*['\"]\\*['\"]"
+  MESSAGE "IAM Resource '*' applies permissions to all resources. Scope the resource ARN to the specific bucket, table, or service where possible."
+  PROMPT "Can the Resource be scoped to a specific ARN? Using '*' as the resource is a privilege escalation risk if the policy is ever attached to the wrong principal."
+}
+
+rule ask-aws-delete {
+  enabled true
+  priority 90
+  severity warning
+  ASK execution
+  IF command CONTAINS "aws s3 rm"
+  OR command CONTAINS "aws s3api delete"
+  OR command CONTAINS "aws ec2 terminate"
+  OR command CONTAINS "aws rds delete"
+  OR command CONTAINS "aws dynamodb delete-table"
+  MESSAGE "AWS resource deletion is irreversible. Verify the target resource and AWS_PROFILE/region before proceeding."
+  PROMPT "Have you confirmed the AWS_PROFILE and region? Which specific resource will be deleted? Is this a production resource?"
+}
+
+rule log-aws-profile {
+  enabled true
+  priority 50
+  severity info
+  LOG execution
+  IF command STARTS_WITH "aws "
+  MESSAGE "AWS CLI command detected. Ensure AWS_PROFILE and AWS_DEFAULT_REGION are set correctly for the target environment."
+}
