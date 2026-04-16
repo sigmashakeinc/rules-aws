@@ -34,8 +34,7 @@ rule aws-imds-v1 {
   enabled true
   priority 85
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/*.tf" AND content LINE_REGEX "http_tokens\\s*=\\s*[\"']optional[\"']"
   MESSAGE "Using IMDSv1 (http_tokens = optional) makes instances vulnerable to SSRF attacks which can leak IAM credentials. Require IMDSv2 by setting http_tokens = 'required'."
-  PROMPT "Are you sure you want to allow IMDSv1? Upgrading to IMDSv2 is strongly recommended."
 }

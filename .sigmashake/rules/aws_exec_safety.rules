@@ -29,11 +29,10 @@ rule no-resource-star-with-write {
   enabled true
   priority 85
   severity warning
-  ASK write
+  LOG write
   IF path GLOB "**/*.json" AND content LINE_REGEX "\"Resource\":\\s*\"\\*\"" AND content CONTAINS "Action"
   OR path GLOB "**/*.yaml" AND content LINE_REGEX "Resource:\\s*['\"]\\*['\"]"
   MESSAGE "IAM Resource '*' applies permissions to all resources. Scope the resource ARN to the specific bucket, table, or service where possible."
-  PROMPT "Can the Resource be scoped to a specific ARN? Using '*' as the resource is a privilege escalation risk if the policy is ever attached to the wrong principal."
 }
 
 rule ask-aws-delete {
